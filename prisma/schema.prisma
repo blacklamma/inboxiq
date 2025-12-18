@@ -8,6 +8,7 @@ datasource db {
 }
 
 enum IndexJobStatus {
+  QUEUED
   NOT_STARTED
   RUNNING
   COMPLETED
@@ -96,7 +97,7 @@ model Embedding {
 model IndexJob {
   id         String        @id @default(cuid())
   userId     String
-  status     IndexJobStatus @default(NOT_STARTED)
+  status     IndexJobStatus @default(QUEUED)
   total      Int           @default(0)
   processed  Int           @default(0)
   lastError  String?

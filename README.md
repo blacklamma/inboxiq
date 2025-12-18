@@ -79,8 +79,21 @@ Route groups live under `src/app/(auth)` and `src/app/(app)`.
 - `npm run db:migrate` – apply Prisma migrations
 - `npm run db:seed` – seed default tags
 - `npm run prisma:studio` – browse the database
+- `npm run worker:indexer` – run the Gmail indexing worker
 
 ## Email + search schema
 
 - EmailMessage/EmailTag/EmailMessageTag and Embedding (pgvector) are defined in `prisma/schema.prisma`.
 - `searchVector` column (tsvector) exists on `EmailMessage` with a GIN index; populate it later via trigger or job (e.g., `to_tsvector('english', coalesce(subject,'') || ' ' || coalesce(cleanedText,''))`).
+
+## Tasks & calendar (planned)
+
+- Endpoint stubs are present:
+  - `POST /app/api/todos/from-email` (returns 501)
+  - `GET /app/api/todos` (empty list)
+- UI stub at `/app/tasks` with a disabled “Generate tasks from selected emails” button.
+- Planned architecture:
+  - Use indexed emails as source, run an LLM pass to extract action items + due dates.
+  - Persist tasks to a `TodoItem` table and link to source email IDs.
+  - For calendar, push events to Google Calendar via OAuth scopes and store event IDs for updates.
+  - Allow manual review/approval before syncing tasks/events.

@@ -17,6 +17,30 @@ export default function AppLayout({
           </Link>
           <div className="ml-auto flex items-center gap-4 text-sm text-slate-500">
             <Link
+              href="/app/inbox"
+              className="font-medium text-slate-700 hover:text-slate-900"
+            >
+              Inbox
+            </Link>
+            <Link
+              href="/app/search"
+              className="font-medium text-slate-700 hover:text-slate-900"
+            >
+              Search
+            </Link>
+            <Link
+              href="/app/tasks"
+              className="font-medium text-slate-700 hover:text-slate-900"
+            >
+              Tasks
+            </Link>
+            <Link
+              href="/app/index"
+              className="font-medium text-slate-700 hover:text-slate-900"
+            >
+              Index
+            </Link>
+            <Link
               href="/app/settings"
               className="font-medium text-slate-700 hover:text-slate-900"
             >
