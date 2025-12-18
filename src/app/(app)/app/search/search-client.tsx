@@ -118,7 +118,7 @@ export function SearchClient() {
           <textarea
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            className="mt-2 w-full rounded-lg border border-slate-200 bg-white p-4 text-sm shadow-sm focus:border-slate-900 focus:outline-none"
+            className="mt-2 w-full rounded-lg border border-slate-300 bg-white p-4 text-base text-slate-900 shadow-sm placeholder:text-slate-500 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
             rows={3}
             placeholder="e.g., invoices from last month about AWS charges"
           />
@@ -131,14 +131,14 @@ export function SearchClient() {
             onChange={(e) =>
               setFilters((f) => ({ ...f, sender: e.target.value }))
             }
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-900 focus:outline-none"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 shadow-sm placeholder:text-slate-500 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
             placeholder="Sender"
           />
           <input
             type="text"
             value={filters.tag ?? ""}
             onChange={(e) => setFilters((f) => ({ ...f, tag: e.target.value }))}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-900 focus:outline-none"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 shadow-sm placeholder:text-slate-500 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
             placeholder="Tag"
           />
           <input
@@ -147,14 +147,14 @@ export function SearchClient() {
             onChange={(e) =>
               setFilters((f) => ({ ...f, from: e.target.value }))
             }
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-900 focus:outline-none"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 shadow-sm placeholder:text-slate-500 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
             placeholder="From date"
           />
           <input
             type="date"
             value={filters.to ?? ""}
             onChange={(e) => setFilters((f) => ({ ...f, to: e.target.value }))}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-slate-900 focus:outline-none"
+            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900 shadow-sm placeholder:text-slate-500 focus:border-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-900/10"
             placeholder="To date"
           />
         </div>
