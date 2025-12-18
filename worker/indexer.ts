@@ -295,7 +295,27 @@ function heuristicTags(
   const fromDomain = from?.split("@")[1]?.toLowerCase() ?? "";
   const tags = new Set<string>();
 
-  const contains = (words: string[]) => words.some((w) => text.includes(w));
+  const contains = (words: string[]) =>
+    words.some((w) => text.includes(w.toLowerCase()));
+
+  const transactionalWords = [
+    "invoice",
+    "receipt",
+    "payment",
+    "order",
+    "statement",
+    "billed",
+    "billing",
+    "subscription",
+    "account",
+    "plan",
+    "credit",
+    "credits",
+    "balance",
+    "charge",
+    "upgrade",
+  ];
+  const isTransactional = contains(transactionalWords);
 
   if (
     contains([
@@ -357,14 +377,28 @@ function heuristicTags(
   }
 
   if (
-    contains([
-      "thanks",
-      "thank you",
-      "appreciate",
+    !isTransactional &&
+    (contains([
+      "congratulations",
+      "congrats",
+      "kudos",
       "great job",
       "well done",
-      "congrats",
-    ])
+      "awesome work",
+      "amazing work",
+      "proud of you",
+      "shout out",
+      "celebrate you",
+    ]) ||
+      contains([
+        "thank you so much",
+        "really appreciate",
+        "deeply appreciate",
+        "appreciate your help",
+        "grateful for",
+        "big thanks",
+        "huge thanks",
+      ]))
   ) {
     tags.add("Praise/Positive");
   }
@@ -384,7 +418,11 @@ function heuristicTags(
     }
   }
 
-  const confidence = tags.size > 0 ? 0.8 : 0.2;
+  const hasTopicalTag = Array.from(tags).some(
+    (t) => !["Work", "Personal"].includes(t)
+  );
+  const confidence =
+    tags.size === 0 ? 0.2 : hasTopicalTag ? 0.85 : 0.55;
   return { tags: Array.from(tags), confidence };
 }
 
@@ -393,6 +431,8 @@ async function llmTags(subject: string | null, body: string | null) {
   const prompt = `
 You are an email classifier. Choose zero or more categories from:
 ${CATEGORIES.join(", ")}.
+
+Avoid marking transactional, billing, or automated messages—or emails that simply end with polite sign-offs like "thanks"—as "Praise/Positive". Focus on the primary intent of the email.
 
 Email subject: ${subject ?? "(none)"}
 Body preview: ${(body ?? "").slice(0, 1000)}
@@ -431,9 +471,12 @@ async function categorizeAndTagEmail(
   const heuristic = heuristicTags(subject, cleanedText, from);
   let tags = heuristic.tags;
 
-  if (tags.length === 0) {
+  const shouldUseLLM =
+    heuristic.confidence < 0.75 || heuristic.tags.length === 0;
+
+  if (shouldUseLLM) {
     const llm = await llmTags(subject, cleanedText);
-    tags = llm;
+    tags = Array.from(new Set([...tags, ...llm]));
   }
 
   if (tags.length === 0) return;
