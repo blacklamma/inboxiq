@@ -1,0 +1,150 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum IndexJobStatus {
+  NOT_STARTED
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        String    @id @default(cuid())
+  email     String?   @unique
+  emailVerified DateTime?
+  name      String?
+  image     String?
+  createdAt DateTime  @default(now())
+
+  accounts  Account[]
+  sessions  Session[]
+
+  connectedAccounts ConnectedAccount[]
+  indexJobs         IndexJob[]
+  emailMessages     EmailMessage[]
+}
+
+model ConnectedAccount {
+  id                    String   @id @default(cuid())
+  userId                String
+  provider              String
+  encryptedRefreshToken String?
+  scopes                String    @default("")
+  createdAt             DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([provider])
+  @@unique([userId, provider])
+}
+
+model EmailMessage {
+  id           String      @id @default(cuid())
+  gmailId      String      @unique
+  threadId     String?
+  from         String?
+  to           String?
+  subject      String?
+  date         DateTime?
+  snippet      String?
+  cleanedText  String?
+  rawHash      String?
+  searchVector Unsupported("tsvector")?
+  userId       String
+  createdAt    DateTime    @default(now())
+
+  user      User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tags      EmailMessageTag[]
+  embedding Embedding?
+
+  @@index([userId, date])
+}
+
+model EmailTag {
+  id        String            @id @default(cuid())
+  name      String            @unique
+  createdAt DateTime          @default(now())
+  emails    EmailMessageTag[]
+}
+
+model EmailMessageTag {
+  emailMessageId String
+  emailTagId     String
+
+  email EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+  tag   EmailTag     @relation(fields: [emailTagId], references: [id], onDelete: Cascade)
+
+  @@id([emailMessageId, emailTagId])
+}
+
+model Embedding {
+  id              String   @id @default(cuid())
+  emailMessageId  String   @unique
+  vector          Unsupported("vector")
+  createdAt       DateTime @default(now())
+
+  email EmailMessage @relation(fields: [emailMessageId], references: [id], onDelete: Cascade)
+}
+
+model IndexJob {
+  id         String        @id @default(cuid())
+  userId     String
+  status     IndexJobStatus @default(NOT_STARTED)
+  total      Int           @default(0)
+  processed  Int           @default(0)
+  lastError  String?
+  createdAt  DateTime      @default(now())
+  startedAt  DateTime?
+  finishedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}

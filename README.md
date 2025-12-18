@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# InboxIQ
 
-## Getting Started
+InboxIQ is a Next.js App Router starter for a Gmail-connected inbox assistant.
 
-First, run the development server:
+## Tech
+
+- Next.js (App Router) + TypeScript
+- Tailwind CSS
+- ESLint + Prettier
+
+## Getting started
+
+### 1) Install dependencies
+
+```bash
+npm install
+```
+
+### 2) Configure environment variables
+
+Create a `.env.local` file (not committed) from the example:
+
+```bash
+cp .env.example .env.local
+```
+
+### 2a) Google OAuth (for local auth)
+
+- Set `NEXTAUTH_URL=http://localhost:3000`
+- Set `NEXTAUTH_SECRET` (any long random string)
+- In Google Cloud Console, create an OAuth Client ID (Web application) and add:
+  - Authorized JavaScript origins: `http://localhost:3000`
+  - Authorized redirect URIs: `http://localhost:3000/api/auth/callback/google`
+- Add Gmail scope permission in the client if prompted.
+- Set `TOKEN_ENCRYPTION_KEY` to a 32-byte base64 string (e.g., `openssl rand -base64 32`).
+
+### 2b) Database (PostgreSQL)
+
+Set `DATABASE_URL` to a PostgreSQL connection string, for example:
+
+```bash
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/inboxiq?schema=public"
+```
+
+Run migrations:
+
+```bash
+npm run db:migrate
+```
+
+Enable pgvector (migration will attempt `CREATE EXTENSION IF NOT EXISTS "vector"`; if your DB user lacks permission, run it manually as a superuser first).
+
+Seed default email tags:
+
+```bash
+npm run db:seed
+```
+
+### 3) Run the dev server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Routes
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Landing page: `/` (CTA: “Sign in with Google”)
+- App area: `/app` (placeholder status)
 
-## Learn More
+Route groups live under `src/app/(auth)` and `src/app/(app)`.
 
-To learn more about Next.js, take a look at the following resources:
+## Scripts
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- `npm run dev` – start dev server
+- `npm run lint` – run ESLint
+- `npm run format` – run Prettier
+- `npm run db:migrate` – apply Prisma migrations
+- `npm run db:seed` – seed default tags
+- `npm run prisma:studio` – browse the database
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Email + search schema
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- EmailMessage/EmailTag/EmailMessageTag and Embedding (pgvector) are defined in `prisma/schema.prisma`.
+- `searchVector` column (tsvector) exists on `EmailMessage` with a GIN index; populate it later via trigger or job (e.g., `to_tsvector('english', coalesce(subject,'') || ' ' || coalesce(cleanedText,''))`).
