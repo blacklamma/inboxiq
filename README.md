@@ -89,8 +89,8 @@ Route groups live under `src/app/(auth)` and `src/app/(app)`.
 ## Tasks & calendar (planned)
 
 - Endpoint stubs are present:
-  - `POST /app/api/todos/from-email` (returns 501)
-  - `GET /app/api/todos` (empty list)
+  - `POST /api/todos/from-email` (returns 501)
+  - `GET /api/todos` (empty list)
 - UI stub at `/app/tasks` with a disabled “Generate tasks from selected emails” button.
 - Planned architecture:
   - Use indexed emails as source, run an LLM pass to extract action items + due dates.

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import OpenAI from "openai";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getServerAuthSession } from "@/lib/auth";
 
@@ -59,6 +60,30 @@ type KeywordWhere = {
   AND?: Record<string, unknown>[];
 };
 
+function extractExcludedTerms(query: string) {
+  const q = query.toLowerCase();
+  const terms = new Set<string>();
+
+  const patterns = [
+    /non[\s-]+([a-z0-9][\w-]{2,})/g,
+    /without\s+([a-z0-9][\w-]{2,})/g,
+    /no\s+([a-z0-9][\w-]{2,})/g,
+    /not\s+(?:a\s+|the\s+)?([a-z0-9][\w-]{2,})/g,
+    /exclud(?:e|ing)\s+([a-z0-9][\w-]{2,})/g,
+    /avoid(?:ing)?\s+([a-z0-9][\w-]{2,})/g,
+  ];
+
+  for (const pattern of patterns) {
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(q))) {
+      const term = match[1]?.trim();
+      if (term) terms.add(term);
+    }
+  }
+
+  return Array.from(terms);
+}
+
 function buildKeywordWhere({
   userId,
   query,
@@ -66,6 +91,7 @@ function buildKeywordWhere({
   tag,
   from,
   to,
+  excludedTerms,
 }: {
   userId: string;
   query: string;
@@ -73,6 +99,7 @@ function buildKeywordWhere({
   tag?: string;
   from?: Date | null;
   to?: Date | null;
+  excludedTerms?: string[];
 }) {
   const where: KeywordWhere = { userId };
   const and: Record<string, unknown>[] = [];
@@ -103,6 +130,17 @@ function buildKeywordWhere({
 
   if (from) and.push({ date: { gte: from } });
   if (to) and.push({ date: { lte: to } });
+  if (excludedTerms?.length) {
+    and.push({
+      NOT: excludedTerms.map((term) => ({
+        OR: [
+          { subject: { contains: term, mode: "insensitive" } },
+          { cleanedText: { contains: term, mode: "insensitive" } },
+          { snippet: { contains: term, mode: "insensitive" } },
+        ],
+      })),
+    });
+  }
 
   if (and.length) where.AND = and;
   return where;
@@ -119,6 +157,7 @@ async function semanticSearch({
   tag,
   from,
   to,
+  excludedTerms,
 }: {
   userId: string;
   queryEmbedding: number[];
@@ -126,39 +165,61 @@ async function semanticSearch({
   tag?: string;
   from?: Date | null;
   to?: Date | null;
+  excludedTerms?: string[];
 }) {
   const vectorLiteral = asVectorLiteral(queryEmbedding);
-  const conditions: string[] = [`"EmailMessage"."userId" = ${userId}`];
+  const conditions: Prisma.Sql[] = [
+    Prisma.sql`"EmailMessage"."userId" = ${userId}`,
+  ];
 
   if (sender) {
-    conditions.push(`"EmailMessage"."from" ILIKE '%' || ${sender} || '%'`);
+    conditions.push(
+      Prisma.sql`"EmailMessage"."from" ILIKE '%' || ${sender} || '%'`
+    );
   }
   if (from) {
-    conditions.push(`"EmailMessage"."date" >= ${from}`);
+    conditions.push(Prisma.sql`"EmailMessage"."date" >= ${from}`);
   }
   if (to) {
-    conditions.push(`"EmailMessage"."date" <= ${to}`);
+    conditions.push(Prisma.sql`"EmailMessage"."date" <= ${to}`);
   }
   if (tag) {
     conditions.push(
-      `"EmailMessage"."id" IN (SELECT "emailMessageId" FROM "EmailMessageTag" EMT JOIN "EmailTag" ET ON EMT."emailTagId" = ET."id" WHERE ET."name" = ${tag})`
+      Prisma.sql`"EmailMessage"."id" IN (
+        SELECT "emailMessageId"
+        FROM "EmailMessageTag" EMT
+        JOIN "EmailTag" ET ON EMT."emailTagId" = ET."id"
+        WHERE ET."name" = ${tag}
+      )`
     );
+  }
+  if (excludedTerms?.length) {
+    for (const term of excludedTerms) {
+      const like = `%${term}%`;
+      conditions.push(
+        Prisma.sql`NOT (
+          "EmailMessage"."subject" ILIKE ${like} OR
+          "EmailMessage"."cleanedText" ILIKE ${like} OR
+          "EmailMessage"."snippet" ILIKE ${like}
+        )`
+      );
+    }
   }
 
   const whereClause = conditions.length
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
+    ? Prisma.sql`WHERE ${Prisma.join(conditions, " AND ")}`
+    : Prisma.sql``;
 
-  const rows = await prisma.$queryRawUnsafe<{ id: string; score: number }[]>(
+  const rows = await prisma.$queryRaw<{ id: string; score: number }[]>(
+    Prisma.sql`
+      SELECT "EmailMessage"."id" as id,
+             1 - ("Embedding"."vector" <#> ${vectorLiteral}::vector) AS score
+      FROM "Embedding"
+      JOIN "EmailMessage" ON "EmailMessage"."id" = "Embedding"."emailMessageId"
+      ${whereClause}
+      ORDER BY score DESC
+      LIMIT 30;
     `
-    SELECT "EmailMessage"."id" as id,
-           1 - ("Embedding"."vector" <#> ${vectorLiteral}::vector) AS score
-    FROM "Embedding"
-    JOIN "EmailMessage" ON "EmailMessage"."id" = "Embedding"."emailMessageId"
-    ${whereClause}
-    ORDER BY score DESC
-    LIMIT 30;
-  `
   );
 
   return rows;
@@ -174,6 +235,7 @@ export async function POST(req: Request) {
   const query = body?.query?.trim() ?? "";
   const sender = body?.sender?.trim() || undefined;
   const tag = body?.tag?.trim() || undefined;
+  const excludedTerms = extractExcludedTerms(query);
 
   if (!query) {
     return NextResponse.json({ results: [] });
@@ -190,6 +252,7 @@ export async function POST(req: Request) {
     tag,
     from,
     to,
+    excludedTerms,
   });
 
   const keywordHits = await prisma.emailMessage.findMany({
@@ -218,12 +281,13 @@ export async function POST(req: Request) {
       if (vector) {
         const semanticHits = await semanticSearch({
           userId: session.user.id,
-          queryEmbedding: vector,
-          sender,
-          tag,
-          from,
-          to,
-        });
+        queryEmbedding: vector,
+        sender,
+        tag,
+        from,
+        to,
+        excludedTerms,
+      });
         for (const hit of semanticHits) {
           const existing = scoredMap.get(hit.id);
           const reason = `Semantic match (cosine ${(hit.score ?? 0).toFixed(2)})`;

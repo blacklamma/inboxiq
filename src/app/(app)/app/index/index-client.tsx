@@ -29,7 +29,7 @@ export function IndexClient({
 
   async function fetchLatest() {
     try {
-      const res = await fetch("/app/api/index-jobs/latest", {
+      const res = await fetch("/api/index-jobs/latest", {
         cache: "no-store",
       });
       if (!res.ok) return;
@@ -44,7 +44,7 @@ export function IndexClient({
     setSubmitting(true);
     setError(null);
     try {
-      const res = await fetch("/app/api/index-jobs", {
+      const res = await fetch("/api/index-jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ total: selectedTotal }),

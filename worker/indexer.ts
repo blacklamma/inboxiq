@@ -264,6 +264,8 @@ async function maybeStoreEmbedding(
   cleanedText: string | null
 ) {
   if (!openai) return;
+  // Use the emailMessageId as the embedding id so it is always non-null and deterministic
+  const embeddingId = emailMessageId;
   const input =
     `${subject ?? ""}\n\n${(cleanedText ?? "").slice(0, MAX_BODY_CHARS)}`.trim();
   if (!input) return;
@@ -278,8 +280,8 @@ async function maybeStoreEmbedding(
 
   const vectorLiteral = `[${vector.join(",")}]`;
   await prisma.$executeRaw`
-    INSERT INTO "Embedding" ("emailMessageId", "vector")
-    VALUES (${emailMessageId}, ${vectorLiteral}::vector)
+    INSERT INTO "Embedding" ("id", "emailMessageId", "vector")
+    VALUES (${embeddingId}, ${emailMessageId}, ${vectorLiteral}::vector)
     ON CONFLICT ("emailMessageId") DO UPDATE SET "vector" = EXCLUDED."vector";
   `;
 }

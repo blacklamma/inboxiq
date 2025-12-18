@@ -49,7 +49,7 @@ export function SearchClient() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/app/api/search", {
+      const res = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: text, ...filters }),
