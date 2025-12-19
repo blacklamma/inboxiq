@@ -11,9 +11,21 @@ function formatDate(date: Date | null) {
   }).format(date);
 }
 
-export default async function InboxPage() {
+const PAGE_SIZE = 20;
+
+export default async function InboxPage({
+  searchParams,
+}: {
+  searchParams?: { page?: string };
+}) {
   const session = await getServerAuthSession();
   const userId = session?.user?.id;
+  const totalMessages = userId
+    ? await prisma.emailMessage.count({ where: { userId } })
+    : 0;
+  const totalPages = Math.max(1, Math.ceil(totalMessages / PAGE_SIZE));
+  const requestedPage = Number(searchParams?.page) || 1;
+  const currentPage = Math.min(Math.max(1, requestedPage), totalPages);
   const messages = userId
     ? await prisma.emailMessage.findMany({
         where: { userId },
@@ -21,9 +33,12 @@ export default async function InboxPage() {
         include: {
           tags: { include: { tag: true } },
         },
-        take: 50,
+        skip: (currentPage - 1) * PAGE_SIZE,
+        take: PAGE_SIZE,
       })
     : [];
+  const rangeStart = totalMessages === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE, totalMessages);
 
   return (
     <div className="space-y-4">
@@ -33,7 +48,9 @@ export default async function InboxPage() {
             Inbox
           </h1>
           <p className="text-sm text-slate-600">
-            Showing your latest indexed emails.
+            {totalMessages > 0
+              ? `Showing ${rangeStart}-${rangeEnd} of ${totalMessages} emails.`
+              : "Showing your latest indexed emails."}
           </p>
         </div>
         <Link
@@ -88,6 +105,38 @@ export default async function InboxPage() {
           ))
         )}
       </div>
+
+      {messages.length > 0 ? (
+        <div className="flex items-center justify-between text-sm text-slate-600">
+          <div>
+            Page {currentPage} of {totalPages}
+          </div>
+          <div className="flex items-center gap-3">
+            <Link
+              href={`/app/inbox?page=${Math.max(1, currentPage - 1)}`}
+              className={`rounded-md border px-3 py-1 font-medium ${
+                currentPage === 1
+                  ? "cursor-not-allowed border-slate-200 text-slate-300"
+                  : "border-slate-300 text-slate-700 hover:border-slate-400 hover:text-slate-900"
+              }`}
+              aria-disabled={currentPage === 1}
+            >
+              Previous
+            </Link>
+            <Link
+              href={`/app/inbox?page=${Math.min(totalPages, currentPage + 1)}`}
+              className={`rounded-md border px-3 py-1 font-medium ${
+                currentPage === totalPages
+                  ? "cursor-not-allowed border-slate-200 text-slate-300"
+                  : "border-slate-300 text-slate-700 hover:border-slate-400 hover:text-slate-900"
+              }`}
+              aria-disabled={currentPage === totalPages}
+            >
+              Next
+            </Link>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
